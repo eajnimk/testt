@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload</title>
+</head>
+<body>
+    <h1>junya.ishigami+associates</h1>
+
+    <form id="uploadForm">
+        <label for="name">Name:</label>
+        <input type="text" id="name" required><br><br>
+
+        <label for="email">Email:</label>
+        <input type="email" id="email" required><br><br>
+
+        <label for="subject">Subject:</label>
+        <input type="text" id="subject" required><br><br>
+
+        <label for="message">Message:</label>
+        <textarea id="message" required></textarea><br><br>
+
+        <label for="fileInput">Attach File(s) (Max 10MB):</label>
+        <input type="file" id="fileInput" multiple><br><br>
+
+        <button type="button" onclick="uploadFiles()">Submit</button>
+    </form>
+
+    <p id="status"></p>
+
+    <script>
+        async function uploadFiles() {
+            let name = document.getElementById("name").value.trim();
+            let email = document.getElementById("email").value.trim();
+            let subject = document.getElementById("subject").value.trim();
+            let message = document.getElementById("message").value.trim();
+            let files = document.getElementById("fileInput").files;
+
+            if (!name || !email || !subject || !message) {
+                alert("Please fill in all fields.");
+                return;
+            }
+
+            if (files.length === 0) {
+                alert("Please select at least one file.");
+                return;
+            }
+
+            // 파일 크기 제한 (최대 10MB)
+            let totalSize = 0;
+            for (let file of files) {
+                totalSize += file.size;
+            }
+            if (totalSize > 10 * 1024 * 1024) {
+                alert("Total file size must be under 10MB.");
+                return;
+            }
+
+            let accessToken = "YOUR_DROPBOX_ACCESS_TOKEN"; // ★ Dropbox API 키 입력
+            let timestamp = new Date().toISOString().replace(/:/g, "-"); // "2025-03-04T12-34-56"
+            let folderName = `/${timestamp}_${name}_${email}`;
+
+            try {
+                // 1️⃣ Dropbox에 폴더 생성
+                let folderResponse = await fetch("https://api.dropboxapi.com/2/files/create_folder_v2", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": "Bearer " + accessToken,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ path: folderName })
+                });
+
+                if (!folderResponse.ok) {
+                    throw new Error("Folder creation failed");
+                }
+
+                // 2️⃣ 각 파일을 폴더 안에 업로드
+                for (let file of files) {
+                    let filePath = `${folderName}/${file.name}`;
+
+                    let fileResponse = await fetch("https://content.dropboxapi.com/2/files/upload", {
+                        method: "POST",
+                        headers: {
+                            "Authorization": "Bearer " + accessToken,
+                            "Dropbox-API-Arg": JSON.stringify({
+                                path: filePath,
+                                mode: "add",
+                                autorename: true,
+                                mute: true
+                            }),
+                            "Content-Type": "application/octet-stream"
+                        },
+                        body: file
+                    });
+
+                    if (!fileResponse.ok) {
+                        throw new Error("File upload failed");
+                    }
+                }
+
+                document.getElementById("status").innerText = "✅ Upload Completed!";
+            } catch (error) {
+                document.getElementById("status").innerText = "❌ Upload Failed!";
+            }
+        }
+    </script>
+</body>
+</html>
